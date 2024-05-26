@@ -7,8 +7,14 @@ import { PointData } from '../model/graph';
 
 
 
+
 const ThreeVisualization = () => {
   const mountRef = useRef<HTMLDivElement>(null);
+  const workerRef = useRef<Worker | null>(null);
+
+  // const [positions,setPostions]=useState([])
+  // const [colors,setColors]=useState([])
+  
 
   const colorArray = [
     "#1f78b4", "#b2df8a", "#33a02c", "#fb9a99", "#e31a1c", "#fdbf6f",
@@ -17,19 +23,19 @@ const ThreeVisualization = () => {
 
   let width = window.innerWidth;
   let height = window.innerHeight;
-  const fov = 100;
+  const fov = 40;
   const near = 1;
-  const far = 12000;
+  const far = 7000;
   const renderer = new THREE.WebGLRenderer();
     
+
   const camera = new THREE.PerspectiveCamera(fov, width / height, near, far);
   const scene = new THREE.Scene();
     
   const pointsGeometry = new THREE.BufferGeometry();
-  const positions: number[] = [];
-  const colors: number[] = [];
 
-  const point_num=2000;
+
+  const point_num=30_000;
 
   const hexToRgba = (hex:string) => {
     const bigint = parseInt(hex.slice(1), 16);
@@ -39,14 +45,19 @@ const ThreeVisualization = () => {
     return {r,g,b};
   };
 
-  function randomPosition(radius) {
-    var pt_angle = Math.random() * 2 * Math.PI;
-    var pt_radius_sq = Math.random() * radius * radius;
-    var pt_x = Math.sqrt(pt_radius_sq) * Math.cos(pt_angle);
-    var pt_y = Math.sqrt(pt_radius_sq) * Math.sin(pt_angle);
+
+
+  function randomPosition(radius:number) {
+    const pt_angle = Math.random() * 2 * Math.PI;
+    const pt_radius_sq = Math.random() * radius * radius;
+    const pt_x = Math.sqrt(pt_radius_sq) * Math.cos(pt_angle);
+    const pt_y = Math.sqrt(pt_radius_sq) * Math.sin(pt_angle);
     return [pt_x, pt_y];
   }
-  
+  const circleSprite = new THREE.TextureLoader().load(
+    "https://fastforwardlabs.github.io/visualization_assets/circle-sprite.png"
+  );
+
 
     useEffect(() => {
   
@@ -55,23 +66,58 @@ const ThreeVisualization = () => {
 
       scene.background = new THREE.Color("white");
   
-      const circleSprite = new THREE.TextureLoader().load(
-        "https://fastforwardlabs.github.io/visualization_assets/circle-sprite.png"
-      );
+  
 
-
-
-
-      for (let i = 0; i < point_num; i++) {
-        const p=
-         randomPosition(2000)
-        positions.push(p[0],p[1],0)
-      const rgba=hexToRgba(colorArray[Math.floor(Math.random() * colorArray.length+0)]);
-        colors.push(rgba.r);
-        colors.push(rgba.g);
-        colors.push(rgba.b);
-
+      workerRef.current = new Worker("generateData.js");
+      workerRef.current.postMessage(point_num); // Example data
+      function animate() {
+        requestAnimationFrame(animate);
+        renderer.render(scene, camera);
       }
+      animate();
+
+      // Listen for messages from the worker
+       workerRef.current.onmessage = (event) => {
+          // setResult(event.data);
+          const {colors,positions}=event.data
+          // console.log("colors",colors)
+          // console.log("postions",positions)
+          // setPostions(positionsData)
+          // setColors(colorsData)
+
+
+
+          const colorAttribute = new THREE.Uint8BufferAttribute(colors, 3);
+          // colorAttribute.normalized = true; 
+          pointsGeometry.setAttribute('color', colorAttribute);
+          pointsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      
+          const pointsMaterial = new THREE.PointsMaterial({
+            size: 50,
+            vertexColors: true,
+            map: circleSprite,
+            transparent: true
+          });
+    
+      
+          const points = new THREE.Points(pointsGeometry, pointsMaterial);
+          scene.add(points);
+          animate();
+      };
+
+      // Send a message to the worker
+  
+
+      // for (let i = 0; i < point_num; i++) {
+      //   const p=
+      //    randomPosition(2000)
+      //   positions.push(p[0],p[1],0)
+      // const rgba=hexToRgba(colorArray[Math.floor(Math.random() * colorArray.length+0)]);
+      //   colors.push(rgba.r);
+      //   colors.push(rgba.g);
+      //   colors.push(rgba.b);
+      // }
+      // const lines=new THREE.Group();
 
   
       // data.forEach((element: PointData) => {
@@ -82,20 +128,8 @@ const ThreeVisualization = () => {
       //   colors.push(rgba.b);
       // });
   
-      const colorAttribute = new THREE.Uint8BufferAttribute(colors, 3);
-      colorAttribute.normalized = true; 
-      pointsGeometry.setAttribute('color', colorAttribute);
-      pointsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  
-      const pointsMaterial = new THREE.PointsMaterial({
-        size: 50,
-        vertexColors: true,
-        map: circleSprite,
-        transparent: true
-      });
-  
-      const points = new THREE.Points(pointsGeometry, pointsMaterial);
-      scene.add(points);
+      // nodes
+ 
   
       const zoom = d3.zoom()
         .scaleExtent([getScaleFromZ(far), getScaleFromZ(near)])
@@ -144,11 +178,7 @@ const ThreeVisualization = () => {
       }
   
   
-      function animate() {
-        requestAnimationFrame(animate);
-        renderer.render(scene, camera);
-      }
-      animate();
+    
   
       const handleResize = () => {
         width = window.innerWidth;
@@ -165,6 +195,25 @@ const ThreeVisualization = () => {
         if (mountRef.current) mountRef.current.removeChild(renderer.domElement);
       };
     }, []);
+
+    // useEffect(()=>{
+
+
+
+    //   const line_material=new THREE.LineBasicMaterial({ color:"#000" });
+    //   const _points = []
+    //   for(let i=0;i<20;i++){
+    //     _points.push(
+    //       new THREE.Vector3(i,i * Math.random() * 100,0),
+    //       new THREE.Vector3(Math.random()*400-200,Math.random()*400-200,Math.random()*400-200),
+    //       );
+    //       // lines.add(newline);
+    //     }
+
+    //     const line_geometry=new THREE.BufferGeometry().setFromPoints( _points );
+    //     const newline=new THREE.LineLoop(line_geometry,line_material);
+    //   scene.add(newline);
+    // },[positions,colors,scene])
 
   return (
     <>
