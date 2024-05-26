@@ -1,13 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import * as d3 from 'd3';
-import data from '../data/forceAtlas2.json'; // Adjust the path as necessary
+// import data from '../data/forceAtlas2.json'; // Adjust the path as necessary
 import _ from 'lodash'; // For sorting, as used in the original code
 import { PointData } from '../model/graph';
 
+
+
 const ThreeVisualization = () => {
   const mountRef = useRef<HTMLDivElement>(null);
-  const [tooltipState, setTooltipState] = useState({ display: 'none', left: 0, top: 0, name: '', group: 0 });
+
   const colorArray = [
     "#1f78b4", "#b2df8a", "#33a02c", "#fb9a99", "#e31a1c", "#fdbf6f",
     "#ff7f00", "#6a3d9a", "#cab2d6", "#ffff99"
@@ -19,6 +21,15 @@ const ThreeVisualization = () => {
   const near = 1;
   const far = 12000;
   const renderer = new THREE.WebGLRenderer();
+    
+  const camera = new THREE.PerspectiveCamera(fov, width / height, near, far);
+  const scene = new THREE.Scene();
+    
+  const pointsGeometry = new THREE.BufferGeometry();
+  const positions: number[] = [];
+  const colors: number[] = [];
+
+  const point_num=2000;
 
   const hexToRgba = (hex:string) => {
     const bigint = parseInt(hex.slice(1), 16);
@@ -28,48 +39,56 @@ const ThreeVisualization = () => {
     return {r,g,b};
   };
 
-    useEffect(() => {
+  function randomPosition(radius) {
+    var pt_angle = Math.random() * 2 * Math.PI;
+    var pt_radius_sq = Math.random() * radius * radius;
+    var pt_x = Math.sqrt(pt_radius_sq) * Math.cos(pt_angle);
+    var pt_y = Math.sqrt(pt_radius_sq) * Math.sin(pt_angle);
+    return [pt_x, pt_y];
+  }
+  
 
+    useEffect(() => {
+  
       renderer.setSize(width, height);
       if (mountRef.current) mountRef.current.appendChild(renderer.domElement);
-  
-      const camera = new THREE.PerspectiveCamera(fov, width / height, near, far);
-      const scene = new THREE.Scene();
+
       scene.background = new THREE.Color("white");
   
       const circleSprite = new THREE.TextureLoader().load(
         "https://fastforwardlabs.github.io/visualization_assets/circle-sprite.png"
       );
-  
-      const pointsGeometry = new THREE.BufferGeometry();
-      const positions: number[] = [];
-      const colors: number[] = [];
-  
-      data.forEach((element: PointData) => {
-        positions.push(+element.x, +element.y, 0);
-        // console.log(Math.floor(Math.random() * colorArray.length+0))
-        // const rgba=hexToRgba(colorArray[Math.floor(Math.random() * colorArray.length+0)]);
-        // console.log(rgba)
-        // colors.push(rgba.r);
-        // colors.push(rgba.g);
-        // colors.push(rgba.b);
 
-        // colors.push( Math.random() * 255,Math.random() * 255,Math.random() * 255 );
-        colors.push( Math.random() * 255 );
-        colors.push( Math.random() * 255 );
-        colors.push( Math.random() * 255 );
-        colors.push( Math.random() * 255 );
+
+
+
+      for (let i = 0; i < point_num; i++) {
+        const p=
+         randomPosition(2000)
+        positions.push(p[0],p[1],0)
+      const rgba=hexToRgba(colorArray[Math.floor(Math.random() * colorArray.length+0)]);
+        colors.push(rgba.r);
+        colors.push(rgba.g);
+        colors.push(rgba.b);
+
+      }
+
   
-      });
+      // data.forEach((element: PointData) => {
+      //   positions.push(+element.x, +element.y, 0);
+      //    const rgba=hexToRgba(colorArray[Math.floor(Math.random() * colorArray.length+0)]);
+      //   colors.push(rgba.r);
+      //   colors.push(rgba.g);
+      //   colors.push(rgba.b);
+      // });
   
-      const colorAttribute = new THREE.Uint8BufferAttribute(colors, 4);
+      const colorAttribute = new THREE.Uint8BufferAttribute(colors, 3);
       colorAttribute.normalized = true; 
       pointsGeometry.setAttribute('color', colorAttribute);
       pointsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   
       const pointsMaterial = new THREE.PointsMaterial({
-        size: 20,
-        sizeAttenuation: false,
+        size: 50,
         vertexColors: true,
         map: circleSprite,
         transparent: true
@@ -88,11 +107,7 @@ const ThreeVisualization = () => {
       const raycaster = new THREE.Raycaster();
       raycaster.params.Points.threshold = 10;
   
-      view.on("mousemove", (event: MouseEvent) => {
-        const [mouseX, mouseY] = d3.pointer(event);
-        checkIntersects([mouseX, mouseY]);
-      });
-  
+ 
       function setUpZoom() {
         view.call(zoom);
         const initialScale = getScaleFromZ(far);
@@ -128,61 +143,6 @@ const ThreeVisualization = () => {
         return angle * (Math.PI / 180);
       }
   
-      function mouseToThree(mouseX: number, mouseY: number) {
-        return new THREE.Vector3(
-          (mouseX / width) * 2 - 1,
-          -(mouseY / height) * 2 + 1,
-          1
-        );
-      }
-  
-      function checkIntersects(mousePosition: [number, number]) {
-        const mouseVector = mouseToThree(...mousePosition);
-        raycaster.setFromCamera(mouseVector, camera);
-        const intersects = raycaster.intersectObject(points);
-        if (intersects[0]) {
-          // const sortedIntersects = _.sortBy(intersects, "distanceToRay");
-          // const intersect = sortedIntersects[0];
-          // const index = intersect.index;
-          // const datum = data[index];
-          // highlightPoint(datum);
-          // showTooltip(mousePosition, datum);
-        } else {
-          // removeHighlights();
-          // hideTooltip();
-        }
-      }
-  
-      // const hoverContainer = new THREE.Object3D();
-      // scene.add(hoverContainer);
-  
-      function highlightPoint(datum: PointData) {
-        removeHighlights();
-  
-        const geometry = new THREE.BufferGeometry();
-        const position = new Float32Array([datum.x, datum.y, 0]);
-        geometry.setAttribute('position', new THREE.BufferAttribute(position, 3));
-        // const color = new Float32Array(new THREE.Color(colorArray[datum.group]).toArray());
-  
-        const material = new THREE.PointsMaterial({
-          size: 26,
-          sizeAttenuation: false,
-          vertexColors: true,
-          map: circleSprite,
-          transparent: true
-        });
-  
-        const point = new THREE.Points(geometry, material);
-        // hoverContainer.add(point);
-      }
-  
-      function removeHighlights() {
-        // hoverContainer.remove(...hoverContainer.children);
-      }
-  
-      function hideTooltip() {
-        setTooltipState(prevState => ({ ...prevState, display: 'none' }));
-      }
   
       function animate() {
         requestAnimationFrame(animate);
@@ -209,31 +169,6 @@ const ThreeVisualization = () => {
   return (
     <>
       <div style={{width:"100%"}} ref={mountRef} />
-      {/* <div id="tooltip" style={{
-        display: tooltipState.display,
-        position: 'absolute',
-        pointerEvents: 'none',
-        fontSize: '13px',
-        width: '120px',
-        textAlign: 'center',
-        lineHeight: 1,
-        padding: '6px',
-        background: 'white',
-        fontFamily: 'sans-serif',
-        left: `${tooltipState.left}px`,
-        top: `${tooltipState.top}px`
-      }}>
-        <div id="point_tip" style={{
-          padding: '4px',
-          marginBottom: '4px',
-          background: colorArray[tooltipState.group]
-        }}>
-          {tooltipState.name}
-        </div>
-        <div id="group_tip" style={{ padding: '4px' }}>
-          Group {tooltipState.group}
-        </div>
-      </div> */}
     </>
   );
 };
