@@ -1,5 +1,5 @@
 import './App.css'
-import ThreeVisualization from './data/Graph'
+import ThreeVisualization from './components/Graph'
 
 function App() {
 
