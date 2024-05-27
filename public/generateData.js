@@ -7,24 +7,32 @@ self.onmessage=function(event){
         return [pt_x, pt_y];
       }
       
-
+      const hexToRgba = (hex) => {
+        const bigint = parseInt(hex.slice(1), 16);
+        const r = (bigint >> 16) & 255;
+        const g = (bigint >> 8) & 255;
+        const b = bigint & 255;
+        return {r,g,b};
+      };
+      const colorArray = [
+        "#1f78b4", "#b2df8a", "#33a02c", "#fb9a99", "#e31a1c", "#fdbf6f",
+        "#ff7f00", "#6a3d9a", "#cab2d6", "#ffff99"
+      ];    
     const colors=[]
     const positions=[]
     console.log(event.data)
 
     for (let i = 0; i < event.data; i++) {
         const p =
-         randomPosition(1000)
-        positions.push(p[0],p[1],0)
-        colors.push(255, 0, 0)
+         randomPosition(1000);
+        positions.push(p[0],p[1],0);
+        // colors.push(255, 0, 0)
         // colors.push("#000000")
         // colors.push("#000000")
-    //   const rgba=hexToRgba(colorArray[Math.floor(Math.random() * colorArray.length+0)]);
-    //     colors.push(rgba.r);
-    //     colors.push(rgba.g);
-    //     colors.push(rgba.b);
-
-  
+        const rgba=hexToRgba(colorArray[Math.floor(Math.random() * colorArray.length+0)]);
+        colors.push(rgba.r);
+        colors.push(rgba.g);
+        colors.push(rgba.b);
     }
     console.log(positions,colors)
     self.postMessage({positions,colors});
