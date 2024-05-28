@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import * as d3 from "d3";
-import nodes from "../data/forceAtlas2.json"; // Adjust the path as necessary
-import _ from "lodash"; // For sorting, as used in the original code
+import nodesData from "../data/nodes.json"; // Adjust the path as necessary
+import _, { size } from "lodash"; // For sorting, as used in the original code
 import { PointData } from "../model/graph";
 
-import edges from '../data/edges.json'
+import edgesData from '../data/edges-v1.json'
 
 const ThreeVisualization = () => {
   const mountRef = useRef<HTMLDivElement>(null);
@@ -16,7 +16,7 @@ const ThreeVisualization = () => {
 
   let width = window.innerWidth;
   let height = window.innerHeight;
-  const fov = 40;
+  const fov = 50;
   const near = 1;
   const far = 7000;
   const renderer = new THREE.WebGLRenderer();
@@ -29,6 +29,17 @@ const ThreeVisualization = () => {
   const circleSprite = new THREE.TextureLoader().load(
     "https://fastforwardlabs.github.io/visualization_assets/circle-sprite.png"
   );
+  function randomPosition(radius) {
+    const pt_angle = Math.random() * 2 * Math.PI;
+    const pt_radius_sq = Math.random() * radius * radius;
+    const pt_x = Math.sqrt(pt_radius_sq) * Math.cos(pt_angle);
+    const pt_y = Math.sqrt(pt_radius_sq) * Math.sin(pt_angle);
+    return [pt_x, pt_y];
+  }
+
+  const mathFloor = (floatNum) => {
+    return Math.floor(floatNum);
+  };
 
   const hexToRgba = (hex) => {
     const bigint = parseInt(hex.slice(1), 16);
@@ -43,14 +54,38 @@ const ThreeVisualization = () => {
     "#33a02c",
     "#fb9a99",
     "#e31a1c",
-    "#fdbf6f",
     "#ff7f00",
     "#6a3d9a",
     "#cab2d6",
-    "#ffff99",
   ];
   const colors = [];
   const positions = [];
+  const nodes_count = 30_000;
+
+  function animate() {
+    requestAnimationFrame(animate);
+    renderer.render(scene, camera);
+  }
+
+  const generateNodes = () => {
+    let nodes = [];
+    for (let i = 0; i < nodes_count; i++) {
+      const p = randomPosition(1000);
+      nodes.push({ x: p[0], y: p[1], id: `${i}` });
+    }
+    return nodes;
+  };
+
+  const generateEdges = () => {
+    let edges = [];
+    for (let i = 0; i < nodes_count/2; i++) {
+      edges.push({
+        source: `${mathFloor(Math.random() * nodes_count)}`,
+        target: `${mathFloor(Math.random() * nodes_count)}`,
+      });
+    }
+    return edges;
+  };
 
   useEffect(() => {
     renderer.setSize(width, height);
@@ -60,26 +95,26 @@ const ThreeVisualization = () => {
 
     // workerRef.current = new Worker("generateData.js");
     // workerRef.current.postMessage(point_num); // Example data
-    function animate() {
-      requestAnimationFrame(animate);
-      renderer.render(scene, camera);
-    }
 
-    // nodes
+
+    let nodes = generateNodes();
+    // let nodes=nodesData
 
     nodes.forEach((element: PointData) => {
-      positions.push(+element.x, +element.y, 0);
+      positions.push(element.x, element.y, 0);
       const rgba = hexToRgba(
-        colorArray[Math.floor(Math.random() * colorArray.length + 0)]
+        colorArray[Math.floor(Math.random() * colorArray.length)]
       );
-  
-      colors.push(Math.random()*250,Math.random()*250,Math.random()*250)
-    });
+      // colors.push(0,204,0)
+      colors.push(rgba.r);
+      colors.push(rgba.g);
+      colors.push(rgba.b);
+    })
+
 
     const colorAttribute = new THREE.Uint8BufferAttribute(colors, 3);
 
-    console.log(colorAttribute)
-    // colorAttribute.normalized = true;
+    colorAttribute.normalized = true;
     pointsGeometry.setAttribute("color", colorAttribute);
     pointsGeometry.setAttribute(
       "position",
@@ -87,7 +122,8 @@ const ThreeVisualization = () => {
     );
 
     const pointsMaterial = new THREE.PointsMaterial({
-      size: 40,
+      size: 50,
+      color: "#6a3d9a",
       vertexColors: true,
       map: circleSprite,
       transparent: true,
@@ -96,7 +132,25 @@ const ThreeVisualization = () => {
     const points = new THREE.Points(pointsGeometry, pointsMaterial);
     scene.add(points);
 
-    renderer.render(scene, camera);
+    //edge generate
+    const edges=generateEdges()
+    // const edges=edgesData
+    const line_material = new THREE.LineBasicMaterial({color:"#1f78b4"});
+    let _lines = [];
+    edges.forEach((edge) => {
+       let source_node = nodes.find((n) => n.id == edge.source);
+      let target_node = nodes.find((n) => n.id == edge.target);
+      _lines.push(new THREE.Vector3(source_node?.x, source_node?.y, 0));
+      _lines.push(new THREE.Vector3(target_node?.x, target_node?.y, 0));
+    });
+
+
+    const lineGeometry = new THREE.BufferGeometry().setFromPoints(_lines);
+    // lineGeometry.setAttribute("color", colorAttribute);
+    scene.add(new THREE.LineSegments(lineGeometry, line_material));
+
+
+    animate();
 
     const zoom = d3
       .zoom()
@@ -106,6 +160,7 @@ const ThreeVisualization = () => {
       );
 
     const view = d3.select(renderer.domElement);
+
     setUpZoom();
 
     const raycaster = new THREE.Raycaster();
@@ -155,37 +210,13 @@ const ThreeVisualization = () => {
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
     };
-    animate();
+
     window.addEventListener("resize", handleResize);
 
     return () => {
       window.removeEventListener("resize", handleResize);
       if (mountRef.current) mountRef.current.removeChild(renderer.domElement);
     };
-  }, []);
-
-  useEffect(() => {
-    const line_material = new THREE.LineBasicMaterial({ color: "#33a02c" });
-    const _points = [];
-
-    edges.splice(0,1).forEach(edge=>{
-      let source_node=nodes.find(n=>n.id ==edge.source);
-      let target_node=nodes.find(n=>n.id ==edge.target)
-      _points.push(
-        new THREE.Vector3(source_node?.x,source_node?.y, 0),
-        new THREE.Vector3( 
-          target_node?.x,
-          target_node?.y,
-          0
-        )
-      );
-    })
-
-
-    const line_geometry = new THREE.BufferGeometry().setFromPoints(_points);
-    const newline = new THREE.LineSegments(line_geometry, line_material);
-    scene.add(newline);
-    renderer.render(scene, camera);
   }, []);
 
   return (
