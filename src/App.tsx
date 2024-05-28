@@ -1,5 +1,6 @@
 import './App.css'
 import ThreeVisualization from './components/Graph'
+import GraphFiber from './components/GraphFiber'
 
 function App() {
 
@@ -7,6 +8,7 @@ function App() {
   return (
     <>
      <ThreeVisualization/>
+     {/* <GraphFiber/> */}
     </>
   )
 }

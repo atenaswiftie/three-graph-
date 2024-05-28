@@ -6,18 +6,21 @@ import _, { size } from "lodash"; // For sorting, as used in the original code
 import { PointData } from "../model/graph";
 
 import edgesData from '../data/edges-v1.json'
+import { MeshLine, MeshLineMaterial, MeshLineRaycast } from 'three.meshline';
+import { dashSize } from "three/examples/jsm/nodes/Nodes.js";
 
 const ThreeVisualization = () => {
   const mountRef = useRef<HTMLDivElement>(null);
-  // const workerRef = useRef<Worker | null>(null);
+  const [loading,setLoading]=useState(true)
+  const workerRef = useRef<Worker | null>(null);
 
   // const [positions,setPostions]=useState([])
   // const [colors,setColors]=useState([])
 
   let width = window.innerWidth;
   let height = window.innerHeight;
-  const fov = 50;
-  const near = 1;
+  const fov = 40;
+  const near = 10;
   const far = 7000;
   const renderer = new THREE.WebGLRenderer();
 
@@ -60,7 +63,12 @@ const ThreeVisualization = () => {
   ];
   const colors = [];
   const positions = [];
-  const nodes_count = 30_000;
+  const nodesCache={}
+
+
+  const nodes_count = 1_000_000;
+
+  const edges_count = 10;
 
   function animate() {
     requestAnimationFrame(animate);
@@ -70,15 +78,17 @@ const ThreeVisualization = () => {
   const generateNodes = () => {
     let nodes = [];
     for (let i = 0; i < nodes_count; i++) {
-      const p = randomPosition(1000);
-      nodes.push({ x: p[0], y: p[1], id: `${i}` });
+      const p = randomPosition(width * 1.9);
+      let obj={ x: p[0], y: p[1], id: `${i}` }
+      nodes.push(obj);
+      nodesCache[`${i}`]=obj
     }
     return nodes;
   };
 
   const generateEdges = () => {
     let edges = [];
-    for (let i = 0; i < nodes_count/2; i++) {
+    for (let i = 0; i < edges_count; i++) {
       edges.push({
         source: `${mathFloor(Math.random() * nodes_count)}`,
         target: `${mathFloor(Math.random() * nodes_count)}`,
@@ -92,9 +102,7 @@ const ThreeVisualization = () => {
     if (mountRef.current) mountRef.current.appendChild(renderer.domElement);
 
     scene.background = new THREE.Color("white");
-
-    // workerRef.current = new Worker("generateData.js");
-    // workerRef.current.postMessage(point_num); // Example data
+ // Example data
 
 
     let nodes = generateNodes();
@@ -122,7 +130,7 @@ const ThreeVisualization = () => {
     );
 
     const pointsMaterial = new THREE.PointsMaterial({
-      size: 50,
+      size: 20,
       color: "#6a3d9a",
       vertexColors: true,
       map: circleSprite,
@@ -132,23 +140,54 @@ const ThreeVisualization = () => {
     const points = new THREE.Points(pointsGeometry, pointsMaterial);
     scene.add(points);
 
-    //edge generate
+    // edge generate
     const edges=generateEdges()
-    // const edges=edgesData
+    //   const line_material = new MeshLineMaterial({color:"#1f78b4",dashArray:0});
+    // let _lines = [];
+    // edges.forEach((edge) => {
+    //    let source_node = nodesCache[edge.source];
+    //   let target_node = nodesCache[edge.target];
+    //   _lines.push(new THREE.Vector3(source_node?.x, source_node?.y, 0));
+    //   _lines.push(new THREE.Vector3(target_node?.x, target_node?.y, 0));
+    // });
+
+
+    // const lineGeometry = new THREE.BufferGeometry().setFromPoints(_lines);
+    // // lineGeometry.setAttribute("color", colorAttribute);
+    // const line=new MeshLine();
+    // line.setGeometry(lineGeometry)
+    // // line.setPoints(_lines);
+    // const mesh = new THREE.Mesh(line, line_material);
+    // scene.add(mesh);
+    // mesh.raycast = MeshLineRaycast;
+
     const line_material = new THREE.LineBasicMaterial({color:"#1f78b4"});
-    let _lines = [];
+    let lines = [];
     edges.forEach((edge) => {
-       let source_node = nodes.find((n) => n.id == edge.source);
-      let target_node = nodes.find((n) => n.id == edge.target);
-      _lines.push(new THREE.Vector3(source_node?.x, source_node?.y, 0));
-      _lines.push(new THREE.Vector3(target_node?.x, target_node?.y, 0));
+      let source_node = nodesCache[edge.source];
+      let target_node = nodesCache[edge.target];
+      lines.push(new THREE.Vector3(source_node?.x, source_node?.y, 0));
+      lines.push(new THREE.Vector3(target_node?.x, target_node?.y, 0));
     });
+    
+
+    workerRef.current = new Worker("generateData.js");
+    const data={
+      lines,nodesCache,edges
+    }
+    workerRef.current.postMessage(data);
+
+     workerRef.current.onmessage = (event) => {
+      
+      console.log(event)
+  };
 
 
-    const lineGeometry = new THREE.BufferGeometry().setFromPoints(_lines);
+
+
+    const lineGeometry = new THREE.BufferGeometry().setFromPoints(lines);
     // lineGeometry.setAttribute("color", colorAttribute);
     scene.add(new THREE.LineSegments(lineGeometry, line_material));
-
 
     animate();
 
@@ -164,7 +203,7 @@ const ThreeVisualization = () => {
     setUpZoom();
 
     const raycaster = new THREE.Raycaster();
-    raycaster.params.Points.threshold = 10;
+    raycaster.params.Points.threshold = 5;
 
     function setUpZoom() {
       view.call(zoom);
@@ -219,9 +258,18 @@ const ThreeVisualization = () => {
     };
   }, []);
 
+
+  useEffect(()=>{
+    if(mountRef?.current){
+      setLoading(false)
+    }
+  },[mountRef])
+
   return (
     <>
-      <div style={{ width: "100%" }} ref={mountRef} />
+    {loading && <b>loading</b> }
+    <div style={{ width: "100%" }} ref={mountRef} />
+      
     </>
   );
 };
