@@ -6,7 +6,7 @@ import _, { size } from "lodash"; // For sorting, as used in the original code
 import { PointData } from "../model/graph";
 
 import edgesData from "../data/edges-v1.json";
-import { MeshLine, MeshLineMaterial, MeshLineRaycast } from 'three.meshline';
+import { MeshLine, MeshLineMaterial, MeshLineRaycast } from "three.meshline";
 import { dashSize } from "three/examples/jsm/nodes/Nodes.js";
 
 const ThreeVisualization = () => {
@@ -77,7 +77,7 @@ const ThreeVisualization = () => {
   const generateNodes = () => {
     let nodes = [];
     for (let i = 0; i < nodes_count; i++) {
-      const p = randomPosition(width * 1.9);
+      const p = randomPosition(width * 2.8);
       let obj = { x: p[0], y: p[1], id: `${i}` };
       nodes.push(obj);
       nodesCache[`${i}`] = obj;
@@ -172,21 +172,27 @@ const ThreeVisualization = () => {
     const data = {
       nodesCache,
       edges,
-      lineMaterial : new MeshLineMaterial({ color: "#1f78b4", dashArray: 0 }),
-      meshLine : new MeshLine(),
-      vector:new THREE.Vector3
     };
     workerRef.current.postMessage(data);
 
     workerRef.current.onmessage = (event) => {
-      console.log(event.data);
-  
-      let mesh = event.data;
-   
 
-    scene.add(mesh);
-    mesh.raycast = MeshLineRaycast;
-   
+      const line_material = new MeshLineMaterial({
+        color: "#1f78b4",
+        dashArray: 0,
+        size:1,
+      });
+
+      const lineGeometry = new THREE.BufferGeometry().setFromPoints(
+        event.data
+      );
+      // lineGeometry.setAttribute("color", colorAttribute);
+      const line = new MeshLine();
+      line.setGeometry(lineGeometry);
+      // line.setPoints(_lines);
+      const mesh = new THREE.Mesh(line, line_material);
+      scene.add(mesh);
+      mesh.raycast = MeshLineRaycast;
     };
 
     // const lineGeometry = new THREE.BufferGeometry().setFromPoints(lines);
